@@ -1,0 +1,33 @@
+{
+    "name": "jonasraoni/osf-to-ops",
+    "description": "OSF to OPS conversor",
+    "homepage": "https://github.com/jonasraoni/osf-to-ops",
+    "require": {
+        "php": ">=7.4",
+        "guzzlehttp/guzzle": "^7.3",
+        "ulrichsg/getopt-php": "^4.0"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^2.18",
+        "brainmaestro/composer-git-hooks": "^2.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "PKP\\OSF\\": "src/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "scripts": {
+        "lint": "php-cs-fixer fix --using-cache=no --diff --dry-run .",
+        "lint-fix": "php-cs-fixer fix --using-cache=no ."
+    },
+    "extra": {
+        "hooks": {
+            "pre-commit": [
+                "./lib/vendor/bin/php-cs-fixer fix --config .php_cs --allow-risky=yes"
+            ]
+        }
+    }
+}
