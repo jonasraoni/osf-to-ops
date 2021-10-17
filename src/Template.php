@@ -63,8 +63,11 @@ class Template
 
     private function getFiles(): array
     {
-        if ($this->files !== null || !($url = $this->preprint->relationships->files->links->related->href ?? null)) {
-            return $this->files;
+        if ($this->files !== null) {
+            return $this->files ?? [];
+        }
+        if (!($url = $this->preprint->relationships->files->links->related->href ?? null)) {
+            return $this->files = [];
         }
         $this->files = [];
         $folders = PageIterator::create($this->client, $url);
@@ -139,7 +142,7 @@ class Template
             $this->addLocalized($node, 'copyrightHolder', implode('; ', $items));
         }
 
-        if ($preprint->license_record->year) {
+        if ($preprint->license_record->year ?? null) {
             $node->copyrightYear = $preprint->license_record->year;
         }
 
@@ -192,10 +195,11 @@ class Template
             $authorNode['seq'] = $author->attributes->index;
             $authorNode['id'] = $author->attributes->index;
 
-            $data = $author->embeds->users->data;
-            $name = $data->attributes->given_name . ($data->attributes->middle_names ? ' ' . $data->attributes->middle_names : '');
+            $data = $author->embeds->users->data ?? null;
+            $metadata = $data->attributes ?? $author->embeds->users->errors[0]->meta;
+            $name = $metadata->given_name . ($metadata->middle_names ? ' ' . $metadata->middle_names : '');
             $this->addLocalized($authorNode, 'givenname', $name);
-            $this->addLocalized($authorNode, 'familyname', $data->attributes->family_name);
+            $this->addLocalized($authorNode, 'familyname', $metadata->family_name);
 
             if ($url = $data->relationships->institutions->links->related->href ?? null) {
                 $institutions = PageIterator::create($this->client, $url);
@@ -209,7 +213,7 @@ class Template
                 }
             }
 
-            $authorNode->email = $data->id . '@engrxiv.publicknowlegeproject.org';
+            $authorNode->email = ($data->id ?? preg_replace('/^\w+-/', '', $author->id)) . '@engrxiv.publicknowlegeproject.org';
             foreach ($data->attributes->social ?? [] as $type => $value) {
                 if ($type === 'orcid') {
                     $authorNode->orcid = $value;

@@ -10,6 +10,8 @@ use Exception;
 use GetOpt\GetOpt;
 use GetOpt\Option;
 
+Logger::handleWarnings();
+
 $cli = new GetOpt([
     Option::create('t', 'token', GetOpt::REQUIRED_ARGUMENT)
         ->setDescription('OSF API token'),
@@ -28,6 +30,9 @@ $cli = new GetOpt([
     Option::create('s', 'sleep', GetOpt::REQUIRED_ARGUMENT)
         ->setDescription('Amount of seconds the script will rest after processing each preprint (default 3 seconds)')
         ->setDefaultValue(3),
+    Option::create('r', 'maxRetry', GetOpt::REQUIRED_ARGUMENT)
+        ->setDescription('Amount of retries before skipping an article (default 5)')
+        ->setDefaultValue(5),
     Option::create('q', 'quiet')
         ->setDescription('Execute quietly (without status display)'),
     Option::create('h', 'help')
@@ -51,7 +56,9 @@ try {
     Logger::log('Setting up memory limit');
     ini_set('memory_limit', $cli['memory']);
     Logger::log('Creating output folder');
-    mkdir($cli['output'], 0600, true);
+    if (!is_dir($cli['output'])) {
+        mkdir($cli['output'], 0600, true);
+    }
 
     Logger::log('Creating HTTP client');
     $client = ClientFactory::create($cli['token']);
@@ -62,10 +69,26 @@ try {
     $preprints = PageIterator::createFromJson($client, $preprints);
     $settings = new Settings($cli['user'], $cli['locale']);
     foreach ($preprints as $index => $preprint) {
+        $attempts = abs($cli['maxRetry']) + 1;
         ++$index;
-        Logger::log("Processing preprint ${index}/${total}:" . $preprint->id, true);
-        $template = new Template($preprint, $settings, $client);
-        file_put_contents($cli['output'] . '/' . preg_replace('/\W/', '-', $preprint->id) . '.xml', $template->process()->asXML());
+        Logger::log("Processing preprint ${index}/${total}: " . $preprint->id, true);
+        $filename = $cli['output'] . '/' . preg_replace('/\W/', '-', $preprint->id) . '.xml';
+        if (file_exists($filename)) {
+            continue;
+        }
+        while ($attempts--) {
+            try {
+                $template = new Template($preprint, $settings, $client);
+                file_put_contents($filename, $template->process()->asXML());
+                break;
+            } catch (\Exception $e) {
+                if (!$attempts) {
+                    Logger::log("Failed to process the preprint ${index}/${total}: " . $preprint->id);
+                    Logger::log((string) $e);
+                    continue 2;
+                }
+            }
+        }
         sleep($cli['sleep']);
     }
     Logger::log('Finished');

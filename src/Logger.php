@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PKP\OSF;
 
+use Exception;
+
 class Logger
 {
     /** @var bool */
@@ -19,5 +21,12 @@ class Logger
         if (static::$verbose) {
             echo($replace ? "\e[K${message}\r" : "${message}\n");
         }
+    }
+
+    public static function handleWarnings(): void
+    {
+        set_error_handler(function (int $code, string $message, string $file, int $line): bool {
+            throw new Exception("${message} at ${file}:{$line}", $code);
+        });
     }
 }
