@@ -6,6 +6,7 @@ namespace PKP\OSF;
 
 use DateTime;
 use Exception;
+use Generator;
 use GuzzleHttp\Client;
 use SimpleXMLElement;
 use SplFileInfo;
@@ -32,6 +33,69 @@ class Template
         $this->preprint = $preprint;
         $this->settings = $settings;
         $this->client = $client;
+    }
+
+    public static function generateDownloadSql(SimpleXMLElement $root, Template $template): Generator
+    {
+        $month = date('Ym');
+        $day = date('Ymd');
+        $types = [];
+        if (!isset($root->publication->preprint_galley)) {
+            return null;
+        }
+        $files = $template->getFiles();
+        $current = -1;
+        $downloads = 0;
+        foreach ($root->publication->preprint_galley as $galley) {
+            if (isset($galley->remote)) {
+                continue;
+            }
+            $downloads = $files[++$current]->attributes->extra->downloads ?? 0;
+            switch (strtolower((string) $galley->name)) {
+                case 'doc':
+                case 'docx':
+                    $types[] = MetricsFileType::DOC;
+                    break;
+                case 'pdf':
+                    $types[] = MetricsFileType::PDF;
+                    break;
+                default:
+                    $types[] = MetricsFileType::OTHER;
+                    break;
+            }
+        }
+        $submissionFileType = 0x0000203;
+        $files = $template->getFiles();
+        foreach ($types as $fileType) {
+            yield "
+            INSERT INTO INSERT INTO metrics (
+                load_id, context_id, pkp_section_id, submission_id, representation_id,
+                assoc_type, assoc_id, day, month, file_type, metric_type, metric
+            )
+            SELECT 'osf-import.txt', 1, 1, p.submission_id, pg.galley_id, ${submissionFileType}, pg.submission_file_id, ${day}, ${month}, ${fileType}, 'ops::counter', ${downloads}
+            FROM publication_settings ps
+            INNER JOIN publications p USING (publication_id)
+            INNER JOIN publication_galleys pg USING (publication_id)
+            WHERE
+                ps.setting_value = '" . str_replace("'", "\\'", $root->publication->title) . "'
+                AND ps.setting_name = 'title'
+            ORDER BY p.submission_id, pg.galley_id
+            LIMIT ${current}, 1;";
+        }
+    }
+
+    public static function generateRedirect(SimpleXMLElement $root, object $preprint): string
+    {
+        return "
+            SELECT CONCAT('Redirect permanent /" . $preprint->id . " https://engrxiv.org/index.php/archive/preprint/view/', (
+                SELECT p.submission_id
+                FROM publication_settings ps
+                INNER JOIN publications p USING (publication_id)
+                WHERE
+                    ps.setting_value = '" . str_replace("'", "\\'", $root->publication->title) . "'
+                    AND ps.setting_name = 'title'
+            ))
+            UNION ALL";
     }
 
     public function process(): SimpleXMLElement
@@ -61,7 +125,7 @@ class Template
     }
 
 
-    private function getFiles(): array
+    public function getFiles(): array
     {
         if ($this->files !== null) {
             return $this->files ?? [];
@@ -85,6 +149,11 @@ class Template
         foreach ($this->getFiles() as $position => $file) {
             ++$position;
             $data = $file->attributes;
+
+            if (!$data->size) {
+                throw new Exception('Invalid submission, file size is zero');
+            }
+
             $node = $this->addNamespaced($parentNode, 'submission_file');
             $node['id'] = $position;
             $node['created_at'] = $this->toDate($data->date_created);
@@ -142,8 +211,8 @@ class Template
             $this->addLocalized($node, 'copyrightHolder', implode('; ', $items));
         }
 
-        if ($preprint->license_record->year ?? null) {
-            $node->copyrightYear = $preprint->license_record->year;
+        if (preg_match('/\d{4}/', $preprint->license_record->year ?? null, $match)) {
+            $node->copyrightYear = $match[0];
         }
 
         $this->processKeywords($node);
@@ -190,7 +259,7 @@ class Template
             ++$position;
             $authorNode = $authorsNode->addChild('author');
             $authorNode['include_in_browse'] = 'true';
-            $authorNode['primary_contact'] = $position < 2;
+            $authorNode['primary_contact'] = (int) ($position < 2);
             $authorNode['user_group_ref'] = DefaultValues::USER_GROUP;
             $authorNode['seq'] = $author->attributes->index;
             $authorNode['id'] = $author->attributes->index;

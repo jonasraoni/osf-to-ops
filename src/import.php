@@ -48,7 +48,7 @@ try {
 
     foreach (['token', 'provider', 'user', 'output', 'locale', 'memory', 'sleep'] as $param) {
         if (!$cli[$param]) {
-            throw new Exception("Argument $param is required");
+            throw new Exception("Argument ${param} is required");
         }
     }
 
@@ -56,8 +56,13 @@ try {
     Logger::log('Setting up memory limit');
     ini_set('memory_limit', $cli['memory']);
     Logger::log('Creating output folder');
-    if (!is_dir($cli['output'])) {
-        mkdir($cli['output'], 0600, true);
+
+    $output = $cli['output'];
+    $xmlOutput = $output . '/xml/';
+    $redirectOutput = $output . '/redirects.sql';
+    $downloadsOutput = $output . '/downloads.sql';
+    if (!is_dir($xmlOutput)) {
+        mkdir($xmlOutput, 0600, true);
     }
 
     Logger::log('Creating HTTP client');
@@ -72,14 +77,19 @@ try {
         $attempts = abs($cli['maxRetry']) + 1;
         ++$index;
         Logger::log("Processing preprint ${index}/${total}: " . $preprint->id, true);
-        $filename = $cli['output'] . '/' . preg_replace('/\W/', '-', $preprint->id) . '.xml';
+        $filename = $xmlOutput . preg_replace('/\W/', '-', $preprint->id) . '.xml';
         if (file_exists($filename)) {
             continue;
         }
         while ($attempts--) {
             try {
                 $template = new Template($preprint, $settings, $client);
-                file_put_contents($filename, $template->process()->asXML());
+                $root = $template->process();
+                file_put_contents($filename, '');//$root->asXML());
+                foreach ($template->generateDownloadSql($root, $template) as $statement) {
+                    file_put_contents($downloadsOutput, $statement . "\n", FILE_APPEND);
+                }
+                file_put_contents($redirectOutput, $template->generateRedirect($root, $preprint) . "\n", FILE_APPEND);
                 break;
             } catch (\Exception $e) {
                 if (!$attempts) {
@@ -91,6 +101,7 @@ try {
         }
         sleep($cli['sleep']);
     }
+    file_put_contents($redirectOutput, "SELECT ''", FILE_APPEND);
     Logger::log('Finished');
 } catch (\Exception $exception) {
     Logger::log('Error: ' . $exception->getMessage());
