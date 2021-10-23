@@ -27,7 +27,7 @@ class PageIterator
                 yield $item;
             }
             $url = $response->links->next;
-            $response = json_decode((string) $client->get($url)->getBody(), false);
+            $response = $url ? json_decode((string) $client->get($url)->getBody(), false) : null;
         }
     }
 }

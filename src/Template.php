@@ -6,7 +6,6 @@ namespace PKP\OSF;
 
 use DateTime;
 use Exception;
-use Generator;
 use GuzzleHttp\Client;
 use SimpleXMLElement;
 use SplFileInfo;
@@ -35,74 +34,12 @@ class Template
         $this->client = $client;
     }
 
-    public static function generateDownloadSql(SimpleXMLElement $root, Template $template): Generator
-    {
-        $month = date('Ym');
-        $day = date('Ymd');
-        $types = [];
-        if (!isset($root->publication->preprint_galley)) {
-            return null;
-        }
-        $files = $template->getFiles();
-        $current = -1;
-        $downloads = 0;
-        foreach ($root->publication->preprint_galley as $galley) {
-            if (isset($galley->remote)) {
-                continue;
-            }
-            $downloads = $files[++$current]->attributes->extra->downloads ?? 0;
-            switch (strtolower((string) $galley->name)) {
-                case 'doc':
-                case 'docx':
-                    $types[] = MetricsFileType::DOC;
-                    break;
-                case 'pdf':
-                    $types[] = MetricsFileType::PDF;
-                    break;
-                default:
-                    $types[] = MetricsFileType::OTHER;
-                    break;
-            }
-        }
-        $submissionFileType = 0x0000203;
-        $files = $template->getFiles();
-        foreach ($types as $fileType) {
-            yield "
-            INSERT INTO INSERT INTO metrics (
-                load_id, context_id, pkp_section_id, submission_id, representation_id,
-                assoc_type, assoc_id, day, month, file_type, metric_type, metric
-            )
-            SELECT 'osf-import.txt', 1, 1, p.submission_id, pg.galley_id, ${submissionFileType}, pg.submission_file_id, ${day}, ${month}, ${fileType}, 'ops::counter', ${downloads}
-            FROM publication_settings ps
-            INNER JOIN publications p USING (publication_id)
-            INNER JOIN publication_galleys pg USING (publication_id)
-            WHERE
-                ps.setting_value = '" . str_replace("'", "\\'", $root->publication->title) . "'
-                AND ps.setting_name = 'title'
-            ORDER BY p.submission_id, pg.galley_id
-            LIMIT ${current}, 1;";
-        }
-    }
-
-    public static function generateRedirect(SimpleXMLElement $root, object $preprint): string
-    {
-        return "
-            SELECT CONCAT('Redirect permanent /" . $preprint->id . " https://engrxiv.org/index.php/archive/preprint/view/', (
-                SELECT p.submission_id
-                FROM publication_settings ps
-                INNER JOIN publications p USING (publication_id)
-                WHERE
-                    ps.setting_value = '" . str_replace("'", "\\'", $root->publication->title) . "'
-                    AND ps.setting_name = 'title'
-            ))
-            UNION ALL";
-    }
-
     public function process(): SimpleXMLElement
     {
         $rootNode = $this->processPreprint();
         $this->processSubmissionFiles($rootNode);
         $this->processPublication($rootNode);
+        $this->ensureSubmissionUploader($rootNode);
         return $rootNode;
     }
 
@@ -163,7 +100,7 @@ class Template
             $node['updated_at'] = $this->toDate($data->date_modified);
             $node['viewable'] = 'false';
             $node['genre'] = DefaultValues::GENRE;
-            $node['uploader'] = $this->settings->username;
+            $node['uploader'] = $this->settings->user;
             $node['language'] = $this->settings->locale;
 
             $node->name = $data->name;
@@ -196,8 +133,9 @@ class Template
         }
 
         $this->addIdentifier($node, Identifier::INTERNAL, 1);
-        if ($preprint->doi) {
-            $this->addIdentifier($node, Identifier::DOI, $preprint->doi);
+        $this->addIdentifier($node, Identifier::PUBLIC, $this->preprint->id);
+        if ($doi = $this->preprint->links->preprint_doi) {
+            $this->addIdentifier($node, Identifier::DOI, $doi);
         }
 
         $this->addLocalized($node, 'title', $preprint->title);
@@ -211,7 +149,7 @@ class Template
             $this->addLocalized($node, 'copyrightHolder', implode('; ', $items));
         }
 
-        if (preg_match('/\d{4}/', $preprint->license_record->year ?? null, $match)) {
+        if (preg_match('/\d{4}/', $preprint->license_record->year ?? '', $match)) {
             $node->copyrightYear = $match[0];
         }
 
@@ -221,6 +159,17 @@ class Template
         $this->processGalleys($node);
 
         return $node;
+    }
+
+    private function ensureSubmissionUploader(SimpleXMLElement $root): void
+    {
+        if ($this->settings->user || !isset($root->publication->authors->author->email)) {
+            return;
+        }
+        $authorId = strtok((string) $root->publication->authors->author->email, '@');
+        foreach ($root->submission_file as $submissionFile) {
+            $submissionFile['uploader'] = $authorId;
+        }
     }
 
     private function processKeywords(SimpleXMLElement $parentNode): void
@@ -282,7 +231,8 @@ class Template
                 }
             }
 
-            $authorNode->email = ($data->id ?? preg_replace('/^\w+-/', '', $author->id)) . '@engrxiv.publicknowlegeproject.org';
+            $authorId = $data->id ?? preg_replace('/^\w+-/', '', $author->id);
+            $authorNode->email = "osf-${authorId}@engrxiv.publicknowlegeproject.org";
             foreach ($data->attributes->social ?? [] as $type => $value) {
                 if ($type === 'orcid') {
                     $authorNode->orcid = $value;
@@ -316,7 +266,7 @@ class Template
             $galleyNode['approved'] = 'false';
 
             $this->addIdentifier($galleyNode, Identifier::INTERNAL, $position);
-            if ($position < 2 && ($doi = $this->preprint->links->preprint_doi)) {
+            if ($position < 2 && ($doi = $this->preprint->attributes->doi)) {
                 $this->addIdentifier($galleyNode, Identifier::DOI, $doi);
             }
             $this->addLocalized($galleyNode, 'name', $label);

@@ -6,7 +6,6 @@ namespace PKP\OSF;
 
 require __DIR__ . '/../vendor/autoload.php';
 
-use Exception;
 use GetOpt\GetOpt;
 use GetOpt\Option;
 
@@ -18,9 +17,15 @@ $cli = new GetOpt([
     Option::create('p', 'provider', GetOpt::REQUIRED_ARGUMENT)
         ->setDescription('Provider, the institution ID/name from where the preprints will be imported (e.g. "engrxiv")'),
     Option::create('u', 'user', GetOpt::REQUIRED_ARGUMENT)
-        ->setDescription('Import username'),
+        ->setDescription('Import username (if not provided, the first author ID will be used instead'),
+    Option::create('c', 'context', GetOpt::REQUIRED_ARGUMENT)
+        ->setDescription('OPS context'),
     Option::create('o', 'output', GetOpt::REQUIRED_ARGUMENT)
         ->setDescription('Output folder, files will be generated using the format "OSF-ID.xml"'),
+    Option::create('b', 'baseUrl', GetOpt::REQUIRED_ARGUMENT)
+        ->setDescription('Base URL that will be used to issue redirects'),
+    Option::create('d', 'requireDoi')
+        ->setDescription('Skips preprints without DOIs'),
     Option::create('l', 'locale', GetOpt::REQUIRED_ARGUMENT)
         ->setDescription('Locale (default "en_US")')
         ->setDefaultValue('en_US'),
@@ -29,7 +34,7 @@ $cli = new GetOpt([
         ->setDefaultValue('1G'),
     Option::create('s', 'sleep', GetOpt::REQUIRED_ARGUMENT)
         ->setDescription('Amount of seconds the script will rest after processing each preprint (default 3 seconds)')
-        ->setDefaultValue(3),
+        ->setDefaultValue(2),
     Option::create('r', 'maxRetry', GetOpt::REQUIRED_ARGUMENT)
         ->setDescription('Amount of retries before skipping an article (default 5)')
         ->setDefaultValue(5),
@@ -46,50 +51,58 @@ try {
         exit(0);
     }
 
-    foreach (['token', 'provider', 'user', 'output', 'locale', 'memory', 'sleep'] as $param) {
-        if (!$cli[$param]) {
-            throw new Exception("Argument ${param} is required");
-        }
-    }
-
-    Logger::$verbose = !$cli['quiet'];
+    $settings = Settings::createFromOptions($cli);
+    Logger::$verbose = !$settings->quiet;
     Logger::log('Setting up memory limit');
-    ini_set('memory_limit', $cli['memory']);
+
+    ini_set('memory_limit', $settings->memory);
     Logger::log('Creating output folder');
 
-    $output = $cli['output'];
+    $output = $settings->output;
     $xmlOutput = $output . '/xml/';
     $redirectOutput = $output . '/redirects.sql';
+    $assignmentsOutput = $output . '/assignments.sql';
     $downloadsOutput = $output . '/downloads.sql';
+    $usersOutput = $output . '/users.sql';
+    $importOutput = $output . '/import.sh';
     if (!is_dir($xmlOutput)) {
         mkdir($xmlOutput, 0600, true);
     }
 
     Logger::log('Creating HTTP client');
-    $client = ClientFactory::create($cli['token']);
+    $client = ClientFactory::create($settings->token);
 
     Logger::log('Retrieving data');
-    $preprints = json_decode((string) $client->get('?embed=license&filter[provider]=' . urlencode($cli['provider']))->getBody(), false);
+    $preprints = json_decode((string) $client->get('?embed=license&filter[provider]=' . urlencode($settings->provider))->getBody(), false);
     $total = $preprints->meta->total ?? $preprints->links->meta->total;
     $preprints = PageIterator::createFromJson($client, $preprints);
-    $settings = new Settings($cli['user'], $cli['locale']);
     foreach ($preprints as $index => $preprint) {
-        $attempts = abs($cli['maxRetry']) + 1;
+        $attempts = abs($settings->maxRetry) + 1;
         ++$index;
         Logger::log("Processing preprint ${index}/${total}: " . $preprint->id, true);
         $filename = $xmlOutput . preg_replace('/\W/', '-', $preprint->id) . '.xml';
         if (file_exists($filename)) {
             continue;
         }
+        if ($settings->requireDoi && !$preprint->links->preprint_doi) {
+            continue;
+        }
         while ($attempts--) {
             try {
                 $template = new Template($preprint, $settings, $client);
                 $root = $template->process();
-                file_put_contents($filename, '');//$root->asXML());
-                foreach ($template->generateDownloadSql($root, $template) as $statement) {
+                file_put_contents($filename, $root->asXML());
+                foreach (Generator::users($root, $settings) as $statement) {
+                    file_put_contents($usersOutput, $statement . "\n", FILE_APPEND);
+                }
+                file_put_contents($assignmentsOutput, Generator::linkUsers($preprint) . "\n", FILE_APPEND);
+                foreach (Generator::downloadStatistics($preprint, $root, $template) as $statement) {
                     file_put_contents($downloadsOutput, $statement . "\n", FILE_APPEND);
                 }
-                file_put_contents($redirectOutput, $template->generateRedirect($root, $preprint) . "\n", FILE_APPEND);
+                if ($settings->baseUrl) {
+                    file_put_contents($redirectOutput, Generator::redirection($preprint, $settings->baseUrl) . "\n", FILE_APPEND);
+                }
+                file_put_contents($importOutput, Generator::importCommand($preprint, $root, $settings) . "\n", FILE_APPEND);
                 break;
             } catch (\Exception $e) {
                 if (!$attempts) {
@@ -99,10 +112,10 @@ try {
                 }
             }
         }
-        sleep($cli['sleep']);
+        sleep($settings->sleep);
     }
     file_put_contents($redirectOutput, "SELECT ''", FILE_APPEND);
-    Logger::log('Finished');
+    Logger::log("\nFinished");
 } catch (\Exception $exception) {
     Logger::log('Error: ' . $exception->getMessage());
     Logger::log($cli->getHelpText());
