@@ -53,7 +53,9 @@ class Template
         $node['stage'] = 'production';
 
         $this->addIdentifier($node, Identifier::INTERNAL, 1);
-        $this->addIdentifier($node, Identifier::PUBLIC, $this->preprint->id);
+        if ($this->settings->includeOsfId) {
+            $this->addIdentifier($node, Identifier::PUBLIC, $this->preprint->id);
+        }
         return $node;
     }
 
@@ -129,7 +131,10 @@ class Template
         }
 
         $this->addIdentifier($node, Identifier::INTERNAL, 1);
-        $this->addIdentifier($node, Identifier::PUBLIC, $this->preprint->id);
+        if ($this->settings->includeOsfId) {
+            $this->addIdentifier($node, Identifier::PUBLIC, $this->preprint->id);
+        }
+
         if ($doi = $this->preprint->links->preprint_doi) {
             $this->addIdentifier($node, Identifier::DOI, $doi);
         }

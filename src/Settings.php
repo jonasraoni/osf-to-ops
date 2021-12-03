@@ -33,6 +33,8 @@ class Settings
 
     public bool $quiet = false;
 
+    public bool $includeOsfId = false;
+
     public string $email = '';
 
     public static function createFromOptions(GetOpt $options): self

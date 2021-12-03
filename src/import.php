@@ -32,6 +32,8 @@ $cli = new GetOpt([
     Option::create('e', 'email', GetOpt::REQUIRED_ARGUMENT)
         ->setDescription('Defines the email pattern to use when creating OSF authors/users, the %s will be replaced by the OSF user ID')
         ->setDefaultValue('osf-%s@ops.publicknowlegeproject.org'),
+    Option::create('i', 'includeOsfId')
+        ->setDescription('Defines whether to include the OSF preprint ID into the Publisher ID field of OPS'),
     Option::create('m', 'memory', GetOpt::REQUIRED_ARGUMENT)
         ->setDescription('Memory limit (default "1G")')
         ->setDefaultValue('1G'),
