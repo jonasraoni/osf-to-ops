@@ -19,7 +19,7 @@ class ClientFactory
             RequestOptions::READ_TIMEOUT => 10,
             RequestOptions::AUTH => 1,
             RequestOptions::HEADERS => [
-                'Authorization' => "Bearer {$token}"
+                'Authorization' => "Bearer ${token}"
             ]
         ]);
     }

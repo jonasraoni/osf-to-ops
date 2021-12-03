@@ -12,17 +12,13 @@ use SplFileInfo;
 
 class Template
 {
-    /** @var object */
-    private $preprint;
+    private object $preprint;
 
-    /** @var Settings */
-    private $settings;
+    private Settings $settings;
 
-    /** @var Client */
-    private $client;
+    private Client $client;
 
-    /** @var array */
-    private $files;
+    private ?array $files = null;
 
     /**
      * Construct
@@ -140,8 +136,15 @@ class Template
 
         $this->addLocalized($node, 'title', $preprint->title);
         $this->addLocalized($node, 'abstract', $preprint->description);
-        if ($rights = $preprint->embeds->license->data->attributes->name ?? null) {
-            $this->addLocalized($node, 'rights', $rights);
+
+        $license = $this->preprint->embeds->license->data;
+        if ($rights = $license->attributes->name ?? null) {
+            $text = $license->attributes->text ?? '';
+            $this->addLocalized($node, 'rights', $text ? "${rights}: ${text}" : $rights);
+        }
+
+        if ($licenseUrl = $license->attributes->url ?? null) {
+            $node->licenseUrl = $licenseUrl;
         }
 
         $items = $this->sanitizeList($preprint->license_record->copyright_holders ?? []);
@@ -185,14 +188,17 @@ class Template
 
     private function processSubjects(SimpleXMLElement $parentNode): void
     {
-        if (!($url = $this->preprint->relationships->subjects->links->related->href ?? null)) {
+        if (($url = $this->preprint->relationships->subjects->links->related->href ?? null)) {
+            $subjects = PageIterator::create($this->client, $url);
+        } elseif (is_array($subjects = $this->preprint->attributes->subjects)) {
+            $subjects = reset($subjects);
+        } else {
             return;
         }
 
         $subjectsNode = $this->addLocalized($parentNode, 'subjects', null);
-        $subjects = PageIterator::create($this->client, $url);
         foreach ($subjects as $subject) {
-            $subjectsNode->subject[] = $subject->attributes->text;
+            $subjectsNode->subject[] = $subject->text ?? $subject->attributes->text;
         }
     }
 
@@ -232,10 +238,10 @@ class Template
             }
 
             $authorId = $data->id ?? preg_replace('/^\w+-/', '', $author->id);
-            $authorNode->email = "osf-${authorId}@engrxiv.publicknowlegeproject.org";
+            $authorNode->email = sprintf($this->settings->email, $authorId);
             foreach ($data->attributes->social ?? [] as $type => $value) {
                 if ($type === 'orcid') {
-                    $authorNode->orcid = $value;
+                    $authorNode->orcid = "https://orcid.org/${value}";
                     break;
                 }
             }
@@ -256,6 +262,10 @@ class Template
 
         foreach ($this->preprint->attributes->prereg_links ?? [] as $link) {
             $galleys[] = ['label' => 'Preregistration', 'isRemote' => true, 'data' => $link];
+        }
+
+        if ($link = $this->preprint->relationships->node->links->related->href ?? null) {
+            $galleys[] = ['label' => 'Supplementary Material', 'isRemote' => true, 'data' => $link];
         }
 
         foreach ($galleys as $position => ['label' => $label, 'isRemote' => $isRemote, 'data' => $data]) {
@@ -282,16 +292,14 @@ class Template
 
     private function addLocalized(SimpleXMLElement $node, string $name, $value): SimpleXMLElement
     {
-        $node->$name = $value;
-        $node = $node->$name;
+        $node = $node->addChild($name, $value);
         $node['locale'] = $this->settings->locale;
         return $node;
     }
 
     private function addNamespaced(SimpleXMLElement $node, string $name): SimpleXMLElement
     {
-        $node->$name = null;
-        $node = $node->$name;
+        $node = $node->addChild($name);
         $node['xmlns:xsi'] = 'http://www.w3.org/2001/XMLSchema-instance';
         $node['xsi:schemaLocation'] = 'http://pkp.sfu.ca native.xsd';
         return $node;
@@ -299,8 +307,7 @@ class Template
 
     private function addIdentifier(SimpleXMLElement $node, string $type, $value): SimpleXMLElement
     {
-        $node->id[] = $type === Identifier::DOI ? str_replace('https://doi.org/', '', $value) : $value;
-        $node = $node->id[count($node->id) - 1];
+        $node = $node->addChild('id', $type === Identifier::DOI ? str_replace('https://doi.org/', '', $value) : (string) $value);
         $node['type'] = $type;
         $node['advice'] = $type === Identifier::INTERNAL ? Advice::IGNORE : Advice::UPDATE;
         return $node;

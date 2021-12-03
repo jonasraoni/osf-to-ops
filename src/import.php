@@ -29,6 +29,9 @@ $cli = new GetOpt([
     Option::create('l', 'locale', GetOpt::REQUIRED_ARGUMENT)
         ->setDescription('Locale (default "en_US")')
         ->setDefaultValue('en_US'),
+    Option::create('e', 'email', GetOpt::REQUIRED_ARGUMENT)
+        ->setDescription('Defines the email pattern to use when creating OSF authors/users, the %s will be replaced by the OSF user ID')
+        ->setDefaultValue('osf-%s@ops.publicknowlegeproject.org'),
     Option::create('m', 'memory', GetOpt::REQUIRED_ARGUMENT)
         ->setDescription('Memory limit (default "1G")')
         ->setDefaultValue('1G'),

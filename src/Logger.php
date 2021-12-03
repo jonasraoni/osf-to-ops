@@ -8,8 +8,7 @@ use Exception;
 
 class Logger
 {
-    /** @var bool */
-    public static $verbose = true;
+    public static bool $verbose = true;
 
     /**
      * Logs the given text
@@ -26,7 +25,7 @@ class Logger
     public static function handleWarnings(): void
     {
         set_error_handler(function (int $code, string $message, string $file, int $line): bool {
-            throw new Exception("${message} at ${file}:{$line}", $code);
+            throw new Exception("${message} at ${file}:${line}", $code);
         });
     }
 }

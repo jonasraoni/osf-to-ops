@@ -9,50 +9,42 @@ use GetOpt\GetOpt;
 
 class Settings
 {
-    /** @var string */
-    public $user = '';
+    public string $user = '';
 
-    /** @var string */
-    public $locale = '';
+    public string $locale = '';
 
-    /** @var string */
-    public $token = '';
+    public string $token = '';
 
-    /** @var string */
-    public $provider = '';
+    public string $provider = '';
 
-    /** @var string */
-    public $context = '';
+    public string $context = '';
 
-    /** @var string */
-    public $output = '';
+    public string $output = '';
 
-    /** @var string */
-    public $memory = '';
+    public string $memory = '';
 
-    /** @var int */
-    public $sleep = 0;
+    public int $sleep = 0;
 
-    /** @var string */
-    public $baseUrl = '';
+    public string $baseUrl = '';
 
-    /** @var bool */
-    public $requireDoi = false;
+    public bool $requireDoi = false;
 
-    /** @var int */
-    public $maxRetry = 0;
+    public int $maxRetry = 0;
 
-    /** @var bool */
-    public $quiet = false;
+    public bool $quiet = false;
+
+    public string $email = '';
 
     public static function createFromOptions(GetOpt $options): self
     {
         $settings = new static();
         foreach (array_keys(get_class_vars(static::class)) as $property) {
-            $settings->$property = $options[$property];
-            settype($settings->$property, gettype($settings->$property));
+            $value = $options[$property];
+            settype($value, gettype($settings->$property));
+            $settings->$property = $value;
         }
-        foreach (['token', 'provider', 'context', 'output', 'locale', 'memory', 'sleep'] as $required) {
+
+        foreach (['token', 'provider', 'context', 'output', 'locale', 'memory', 'sleep', 'email'] as $required) {
             if (!$settings->$required) {
                 throw new Exception("The setting ${required} is required");
             }
