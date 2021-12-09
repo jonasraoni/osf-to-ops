@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PKP\OSF;
 
+/**
+ * Default values to use when importing the preprints
+ */
 class DefaultValues
 {
     public const STAGE = 'proof';

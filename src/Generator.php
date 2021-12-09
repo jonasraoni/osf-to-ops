@@ -6,6 +6,9 @@ namespace PKP\OSF;
 
 use SimpleXMLElement;
 
+/**
+ * Generates some pre/pos import scripts for SQL and also Apache redirections
+ */
 class Generator
 {
     public static function users(SimpleXMLElement $root, Settings $settings): \Generator
@@ -76,7 +79,7 @@ class Generator
         if (!isset($root->publication->preprint_galley)) {
             return null;
         }
-        $files = $template->getFiles();
+        $files = $template->getAllFiles();
         $current = -1;
         $downloads = 0;
         foreach ($root->publication->preprint_galley as $galley) {
@@ -98,7 +101,7 @@ class Generator
             }
         }
         $submissionFileType = 0x0000203;
-        $files = $template->getFiles();
+        $files = $template->getAllFiles();
         foreach ($types as $fileType) {
             yield "
             INSERT INTO metrics (

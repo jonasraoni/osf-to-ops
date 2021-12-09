@@ -10,6 +10,9 @@ use GuzzleHttp\Client;
 use SimpleXMLElement;
 use SplFileInfo;
 
+/**
+ * An API walker, at the end of the process a XML string will be available for streaming
+ */
 class Template
 {
     private object $preprint;
@@ -18,7 +21,9 @@ class Template
 
     private Client $client;
 
-    private ?array $files = null;
+    private ?array $submissionFiles = null;
+
+    private ?array $supplementaryFiles = null;
 
     /**
      * Construct
@@ -59,29 +64,44 @@ class Template
         return $node;
     }
 
-
-    public function getFiles(): array
+    public function getSupplementaryFiles(): array
     {
-        if ($this->files !== null) {
-            return $this->files ?? [];
+        if ($url = $this->preprint->relationships->node->links->related->href ?? null) {
+            $response = json_decode((string) $this->client->get($url)->getBody(), false);
+            $url = $response->data->relationships->files->links->related->href ?? null;
         }
-        if (!($url = $this->preprint->relationships->files->links->related->href ?? null)) {
-            return $this->files = [];
+        return $this->supplementaryFiles ??= $this->getFiles($url);
+    }
+
+    public function getSubmissionFiles(): array
+    {
+        return $this->submissionFiles ??= $this->getFiles($this->preprint->relationships->files->links->related->href ?? null);
+    }
+
+    public function getFiles(?string $url): array
+    {
+        if (!$url) {
+            return [];
         }
-        $this->files = [];
+        $files = [];
         $folders = PageIterator::create($this->client, $url);
         foreach ($folders as $folder) {
             if (!($url = $folder->relationships->files->links->related->href ?? null)) {
                 continue;
             }
-            $this->files = array_merge($this->files, iterator_to_array(PageIterator::create($this->client, $url)));
+            $files = array_merge($files, iterator_to_array(PageIterator::create($this->client, $url)));
         }
-        return $this->files;
+        return $files;
+    }
+
+    public function getAllFiles(): array
+    {
+        return [...$this->getSubmissionFiles(), ...$this->getSupplementaryFiles()];
     }
 
     private function processSubmissionFiles(SimpleXMLElement $parentNode): void
     {
-        foreach ($this->getFiles() as $position => $file) {
+        foreach ($this->getAllFiles() as $position => $file) {
             ++$position;
             $data = $file->attributes;
 
@@ -162,7 +182,7 @@ class Template
         }
 
         $this->processKeywords($node);
-        $this->processSubjects($node);
+        $this->processDisciplines($node);
         $this->processAuthors($node);
         $this->processGalleys($node);
 
@@ -191,7 +211,7 @@ class Template
         }
     }
 
-    private function processSubjects(SimpleXMLElement $parentNode): void
+    private function processDisciplines(SimpleXMLElement $parentNode): void
     {
         if (($url = $this->preprint->relationships->subjects->links->related->href ?? null)) {
             $subjects = PageIterator::create($this->client, $url);
@@ -201,9 +221,9 @@ class Template
             return;
         }
 
-        $subjectsNode = $this->addLocalized($parentNode, 'subjects', null);
+        $disciplinesNode = $this->addLocalized($parentNode, 'disciplines', null);
         foreach ($subjects as $subject) {
-            $subjectsNode->subject[] = $subject->text ?? $subject->attributes->text;
+            $disciplinesNode->discipline[] = $subject->text ?? $subject->attributes->text;
         }
     }
 
@@ -256,9 +276,13 @@ class Template
     private function processGalleys(SimpleXMLElement $parentNode): void
     {
         $galleys = [];
-        foreach ($this->getFiles() as $position => $file) {
-            ++$position;
-            $galleys[] = ['label' => strtoupper((new SplFileInfo($file->attributes->name))->getExtension()), 'isRemote' => false, 'data' => $position];
+        $submissionPosition = 0;
+        foreach ($this->getSubmissionFiles() as $submissionPosition => $file) {
+            $galleys[] = ['label' => strtoupper((new SplFileInfo($file->attributes->name))->getExtension()), 'isRemote' => false, 'data' => ++$submissionPosition];
+        }
+
+        foreach ($this->getSupplementaryFiles() as $i => $file) {
+            $galleys[] = ['label' => 'Supplementary Material (' . strtoupper((new SplFileInfo($file->attributes->name))->getExtension()) . ')', 'isRemote' => false, 'data' => $submissionPosition + $i + 1];
         }
 
         foreach ($this->preprint->attributes->data_links ?? [] as $link) {
@@ -267,10 +291,6 @@ class Template
 
         foreach ($this->preprint->attributes->prereg_links ?? [] as $link) {
             $galleys[] = ['label' => 'Preregistration', 'isRemote' => true, 'data' => $link];
-        }
-
-        if ($link = $this->preprint->relationships->node->links->related->href ?? null) {
-            $galleys[] = ['label' => 'Supplementary Material', 'isRemote' => true, 'data' => $link];
         }
 
         foreach ($galleys as $position => ['label' => $label, 'isRemote' => $isRemote, 'data' => $data]) {

@@ -7,6 +7,9 @@ namespace PKP\OSF;
 use Exception;
 use GetOpt\GetOpt;
 
+/**
+ * Holds the user input settings
+ */
 class Settings
 {
     public string $user = '';

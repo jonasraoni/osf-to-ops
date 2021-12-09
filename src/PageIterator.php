@@ -7,6 +7,9 @@ namespace PKP\OSF;
 use Generator;
 use GuzzleHttp\Client;
 
+/**
+ * Generic iterator to pass through the pages of an OSF API node
+ */
 class PageIterator
 {
     public static function create(Client $client, string $url): Generator

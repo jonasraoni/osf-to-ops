@@ -6,6 +6,9 @@ namespace PKP\OSF;
 
 use Exception;
 
+/**
+ * Generic class to deal with unhandled exceptions and output console messages
+ */
 class Logger
 {
     public static bool $verbose = true;

@@ -16,7 +16,7 @@ This repository uses the [OSF API](https://developer.osf.io) ([Open Science Fram
 
 3. Go to the administration interface, enable and setup the DOI and ORCID plugins at the `Website > Plugins`
 
-4. At the `Workflow > Metadata`, enable the: `Keywords`, `Rights`, `Subjects` and `Publisher ID`.
+4. At the `Workflow > Metadata`, enable the: `Keywords`, `Rights`, `Disciplines` and `Publisher ID`.
 
 5. At the root of this repository, run the command bellow to get more information about the usage, then execute it to produce the import data
 ```bash

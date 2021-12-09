@@ -7,6 +7,9 @@ namespace PKP\OSF;
 use GuzzleHttp\Client;
 use GuzzleHttp\RequestOptions;
 
+/**
+ * Builds a new HTTP client, ready to make requests against the OSF API
+ */
 class ClientFactory
 {
     public static function create(string $token): Client
