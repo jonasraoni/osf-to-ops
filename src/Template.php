@@ -64,6 +64,15 @@ class Template
         return $node;
     }
 
+    public function getSupplementaryLink(): ?string
+    {
+        if ($url = $this->preprint->relationships->node->links->related->href ?? null) {
+            $response = json_decode((string) $this->client->get($url)->getBody(), false);
+            $url = $response->data->links->html ?? null;
+        }
+        return $url;
+    }
+
     public function getSupplementaryFiles(): array
     {
         if ($url = $this->preprint->relationships->node->links->related->href ?? null) {
@@ -96,7 +105,7 @@ class Template
 
     public function getAllFiles(): array
     {
-        return [...$this->getSubmissionFiles(), ...$this->getSupplementaryFiles()];
+        return [...$this->getSubmissionFiles(), ...($this->settings->saveSupplementaryFiles ? $this->getSupplementaryFiles() : [])];
     }
 
     private function processSubmissionFiles(SimpleXMLElement $parentNode): void
@@ -281,8 +290,12 @@ class Template
             $galleys[] = ['label' => strtoupper((new SplFileInfo($file->attributes->name))->getExtension()), 'isRemote' => false, 'data' => ++$submissionPosition];
         }
 
-        foreach ($this->getSupplementaryFiles() as $i => $file) {
-            $galleys[] = ['label' => 'Supplementary Material (' . strtoupper((new SplFileInfo($file->attributes->name))->getExtension()) . ')', 'isRemote' => false, 'data' => $submissionPosition + $i + 1];
+        if ($this->settings->saveSupplementaryFiles) {
+            foreach ($this->getSupplementaryFiles() as $i => $file) {
+                $galleys[] = ['label' => 'Supplementary Material', 'isRemote' => false, 'data' => $submissionPosition + $i + 1];
+            }
+        } elseif ($link = $this->getSupplementaryLink()) {
+            $galleys[] = ['label' => 'Supplementary Material', 'isRemote' => true, 'data' => $link];
         }
 
         foreach ($this->preprint->attributes->data_links ?? [] as $link) {

@@ -40,6 +40,8 @@ class Settings
 
     public string $email = '';
 
+    public bool $saveSupplementaryFiles = false;
+
     public static function createFromOptions(GetOpt $options): self
     {
         $settings = new static();

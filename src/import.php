@@ -34,6 +34,8 @@ $cli = new GetOpt([
         ->setDefaultValue('osf-%s@ops.publicknowlegeproject.org'),
     Option::create('i', 'includeOsfId')
         ->setDescription('Defines whether to include the OSF preprint ID into the Publisher ID field of OPS'),
+    Option::create('a', 'saveSupplementaryFiles')
+        ->setDescription('Defines whether to save the supplementary file (if not defined, just a remote galley will be created)'),
     Option::create('m', 'memory', GetOpt::REQUIRED_ARGUMENT)
         ->setDescription('Memory limit (default "1G")')
         ->setDefaultValue('1G'),
