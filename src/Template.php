@@ -171,7 +171,7 @@ class Template
         $this->addLocalized($node, 'title', $preprint->title);
         $this->addLocalized($node, 'abstract', $preprint->description);
 
-        $license = $this->preprint->embeds->license->data;
+        $license = $this->preprint->embeds->license->data ?? null;
         if ($rights = $license->attributes->name ?? null) {
             $text = $license->attributes->text ?? '';
             $this->addLocalized($node, 'rights', $text ? "${rights}: ${text}" : $rights);
