@@ -36,7 +36,7 @@ class Settings
 
     public bool $quiet = false;
 
-    public bool $includeOsfId = false;
+    public bool $includeOsfId = true;
 
     public string $email = '';
 

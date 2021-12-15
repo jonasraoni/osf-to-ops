@@ -116,6 +116,7 @@ class Generator
             WHERE
                 ps.setting_value = ${preprintId}
                 AND ps.setting_name = 'pub-id::publisher-id'
+                AND pg.remote_url IS NULL
             ORDER BY p.submission_id, pg.galley_id
             LIMIT ${current}, 1;";
         }
