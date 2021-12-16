@@ -130,6 +130,7 @@ class Generator
             $user = strtok((string) $author->email, '@');
             return "php tools/importExport.php NativeImportExportPlugin import ${path} ${context} ${user}";
         }
+        return '';
     }
 
     public static function redirection(object $preprint, string $baseUrl): string
