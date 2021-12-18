@@ -150,6 +150,35 @@ class Generator
             UNION ALL";
     }
 
+    public static function publicationRelation(object $preprint): ?string
+    {
+        $doi = $preprint->attributes->doi ?? null;
+        if (!$doi) {
+            return null;
+        }
+
+        $escapedDoi = self::escape($doi);
+        $escapedPreprintId = self::escape($preprint->id);
+        $publicationRelation = DefaultValues::PUBLICATION_RELATION;
+        return "
+            INSERT INTO publication_settings (publication_id, locale, setting_name, setting_value)
+            VALUES
+            ((
+                SELECT ps.publication_id
+                FROM publication_settings ps
+                WHERE
+                    ps.setting_value = ${escapedPreprintId}
+                    AND ps.setting_name = 'pub-id::publisher-id'
+            ), '', 'vorDoi', ${escapedDoi}),
+            ((
+                SELECT ps.publication_id
+                FROM publication_settings ps
+                WHERE
+                    ps.setting_value = ${escapedPreprintId}
+                    AND ps.setting_name = 'pub-id::publisher-id'
+            ), '', 'relationStatus', '${publicationRelation}');";
+    }
+
     private static function escape(string $data): string
     {
         return "'" . addcslashes($data, "\\'\0") . "'";

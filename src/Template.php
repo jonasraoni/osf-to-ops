@@ -7,6 +7,7 @@ namespace PKP\OSF;
 use DateTime;
 use Exception;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ClientException;
 use SimpleXMLElement;
 use SplFileInfo;
 
@@ -67,8 +68,15 @@ class Template
     public function getSupplementaryLink(): ?string
     {
         if ($url = $this->preprint->relationships->node->links->related->href ?? null) {
-            $response = json_decode((string) $this->client->get($url)->getBody(), false);
-            $url = $response->data->links->html ?? null;
+            try {
+                $response = json_decode((string) $this->client->get($url)->getBody(), false);
+                $url = $response->data->links->html ?? null;
+            } catch (ClientException $e) {
+                if (in_array($e->getResponse()->getStatusCode(), [403, 410])) {
+                    return null;
+                }
+                throw $e;
+            }
         }
         return $url;
     }
@@ -76,8 +84,15 @@ class Template
     public function getSupplementaryFiles(): array
     {
         if ($url = $this->preprint->relationships->node->links->related->href ?? null) {
-            $response = json_decode((string) $this->client->get($url)->getBody(), false);
-            $url = $response->data->relationships->files->links->related->href ?? null;
+            try {
+                $response = json_decode((string) $this->client->get($url)->getBody(), false);
+                $url = $response->data->relationships->files->links->related->href ?? null;
+            } catch (ClientException $e) {
+                if (in_array($e->getResponse()->getStatusCode(), [403, 410])) {
+                    return $this->supplementaryFiles = [];
+                }
+                throw $e;
+            }
         }
         return $this->supplementaryFiles ??= $this->getFiles($url);
     }
@@ -155,7 +170,7 @@ class Template
             $node['date_published'] = $publishedDate;
         }
 
-        if ($this->preprint->relationships->contributors->links ?? null) {
+        if ($this->preprint->relationships->bibliographic_contributors->links ?? null) {
             $node['primary_contact_id'] = 1;
         }
 
@@ -171,9 +186,12 @@ class Template
         $this->addLocalized($node, 'title', $preprint->title);
         $this->addLocalized($node, 'abstract', $preprint->description);
 
+        $copyrightHolders = implode('; ', $this->sanitizeList($preprint->license_record->copyright_holders ?? []));
+        $copyrightYear = preg_match('/\d{4}/', $preprint->license_record->year ?? '', $match) ? $match[0] : null;
+
         $license = $this->preprint->embeds->license->data ?? null;
         if ($rights = $license->attributes->name ?? null) {
-            $text = $license->attributes->text ?? '';
+            $text = str_replace(['{{year}}', '{{copyrightHolders}}'], [$copyrightYear, $copyrightHolders], $license->attributes->text ?? '');
             $this->addLocalized($node, 'rights', $text ? "${rights}: ${text}" : $rights);
         }
 
@@ -181,13 +199,12 @@ class Template
             $node->licenseUrl = $licenseUrl;
         }
 
-        $items = $this->sanitizeList($preprint->license_record->copyright_holders ?? []);
-        if (count($items)) {
-            $this->addLocalized($node, 'copyrightHolder', implode('; ', $items));
+        if ($copyrightHolders) {
+            $this->addLocalized($node, 'copyrightHolder', $copyrightHolders);
         }
 
-        if (preg_match('/\d{4}/', $preprint->license_record->year ?? '', $match)) {
-            $node->copyrightYear = $match[0];
+        if ($copyrightYear) {
+            $node->copyrightYear = $copyrightYear;
         }
 
         $this->processKeywords($node);
@@ -238,7 +255,7 @@ class Template
 
     private function processAuthors(SimpleXMLElement $parentNode): void
     {
-        if (!($url = $this->preprint->relationships->contributors->links->related->href ?? null)) {
+        if (!($url = $this->preprint->relationships->bibliographic_contributors->links->related->href ?? null)) {
             return;
         }
 
@@ -330,6 +347,8 @@ class Template
 
     private function addLocalized(SimpleXMLElement $node, string $name, $value): SimpleXMLElement
     {
+        // Unexpected unescaped entity
+        $value = preg_replace(['/&(\s)/', '//', '//'], ['&amp;$1', 'ff', 'f'], (string) $value);
         $node = $node->addChild($name, $value);
         $node['locale'] = $this->settings->locale;
         return $node;

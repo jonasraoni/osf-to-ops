@@ -71,6 +71,7 @@ try {
     $assignmentsOutput = $output . '/assignments.sql';
     $downloadsOutput = $output . '/downloads.sql';
     $usersOutput = $output . '/users.sql';
+    $publicationRelationOutput = $output . '/publication-relation.sql';
     $importOutput = $output . '/import.sh';
     if (!is_dir($xmlOutput)) {
         mkdir($xmlOutput, 0600, true);
@@ -103,6 +104,7 @@ try {
                     file_put_contents($usersOutput, $statement . "\n", FILE_APPEND);
                 }
                 file_put_contents($assignmentsOutput, Generator::linkUsers($preprint) . "\n", FILE_APPEND);
+                file_put_contents($publicationRelationOutput, Generator::publicationRelation($preprint) . "\n", FILE_APPEND);
                 foreach (Generator::downloadStatistics($preprint, $root, $template) as $statement) {
                     file_put_contents($downloadsOutput, $statement . "\n", FILE_APPEND);
                 }
