@@ -40,7 +40,7 @@ $cli = new GetOpt([
         ->setDescription('Memory limit (default "1G")')
         ->setDefaultValue('1G'),
     Option::create('s', 'sleep', GetOpt::REQUIRED_ARGUMENT)
-        ->setDescription('Amount of seconds the script will rest after processing each preprint (default 3 seconds)')
+        ->setDescription('Amount of seconds the script will rest after processing each preprint (default 2 seconds)')
         ->setDefaultValue(2),
     Option::create('r', 'maxRetry', GetOpt::REQUIRED_ARGUMENT)
         ->setDescription('Amount of retries before skipping an article (default 5)')
