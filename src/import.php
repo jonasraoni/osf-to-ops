@@ -8,6 +8,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use GetOpt\GetOpt;
 use GetOpt\Option;
+use SplFileObject;
 
 Logger::handleWarnings();
 
@@ -124,6 +125,14 @@ try {
         sleep($settings->sleep);
     }
     file_put_contents($redirectOutput, "SELECT ''", FILE_APPEND);
+
+    $file = new SplFileObject($output . '/import-fixed.sh', 'w');
+    foreach (array_reverse(file($importOutput)) as $line) {
+        $file->fwrite($line);
+    }
+    $output = null;
+    rename($output . '/import-fixed.sh', $importOutput);
+
     Logger::log("\nFinished");
 } catch (\Exception $exception) {
     Logger::log('Error: ' . $exception->getMessage());
