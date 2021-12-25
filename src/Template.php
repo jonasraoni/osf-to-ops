@@ -125,19 +125,16 @@ class Template
 
     private function processSubmissionFiles(SimpleXMLElement $parentNode): void
     {
+        $filePosition = 0;
         foreach ($this->getAllFiles() as $position => $file) {
             ++$position;
             $data = $file->attributes;
-
-            if (!$data->size) {
-                throw new Exception('Invalid submission, file size is zero');
-            }
 
             $node = $this->addNamespaced($parentNode, 'submission_file');
             $node['id'] = $position;
             $node['created_at'] = $this->toDate($data->date_created);
             $node['date_created'] = null;
-            $node['file_id'] = $position;
+            $node['file_id'] = $filePosition + 1;
             $node['stage'] = DefaultValues::STAGE;
             $node['updated_at'] = $this->toDate($data->date_modified);
             $node['viewable'] = 'false';
@@ -146,12 +143,29 @@ class Template
             $node['language'] = $this->settings->locale;
 
             $node->name = $data->name;
-            $node->file['id'] = $position;
-            $node->file['filesize'] = $data->size;
-            $node->file['extension'] = (new SplFileInfo($data->name))->getExtension();
 
-            $node->file->embed = base64_encode((string) $this->client->get($file->links->download)->getBody());
-            $node->file->embed['encoding'] = 'base64';
+            $hasSubmissionFile = false;
+            foreach (PageIterator::create($this->client, $file->relationships->versions->links->related->href) as $fileVersion) {
+                $attributes = $fileVersion->attributes;
+                if (!$attributes->size) {
+                    Logger::log('Skipped empty submission file revision for the preprint "' . $this->preprint->id . '"');
+                    continue;
+                }
+
+                ++$filePosition;
+                $hasSubmissionFile = true;
+                $fileNode = $this->addNamespaced($node, 'file');
+                $fileNode['id'] = $filePosition;
+                $fileNode['filesize'] = $attributes->size;
+                $fileNode['extension'] = (new SplFileInfo($attributes->name))->getExtension();
+
+                $fileNode->embed = base64_encode((string) $this->client->get($fileVersion->links->download)->getBody());
+                $fileNode->embed['encoding'] = 'base64';
+            }
+
+            if (!$hasSubmissionFile) {
+                throw new Exception('No submission file was found for the preprint "' . $this->preprint->id . '"');
+            }
         }
     }
 
@@ -331,9 +345,6 @@ class Template
             $galleyNode['approved'] = 'false';
 
             $this->addIdentifier($galleyNode, Identifier::INTERNAL, $position);
-            if ($position < 2 && ($doi = $this->preprint->attributes->doi)) {
-                $this->addIdentifier($galleyNode, Identifier::DOI, $doi);
-            }
             $this->addLocalized($galleyNode, 'name', $label);
             $galleyNode->seq = $position;
 

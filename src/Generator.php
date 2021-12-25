@@ -157,7 +157,7 @@ class Generator
             return null;
         }
 
-        $escapedDoi = self::escape($doi);
+        $escapedDoi = self::escape("https://doi.org/${doi}");
         $escapedPreprintId = self::escape($preprint->id);
         $publicationRelation = DefaultValues::PUBLICATION_RELATION;
         return "

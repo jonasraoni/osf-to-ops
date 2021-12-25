@@ -130,7 +130,7 @@ try {
     foreach (array_reverse(file($importOutput)) as $line) {
         $file->fwrite($line);
     }
-    $output = null;
+    $file = null;
     rename($output . '/import-fixed.sh', $importOutput);
 
     Logger::log("\nFinished");
