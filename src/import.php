@@ -37,6 +37,8 @@ $cli = new GetOpt([
         ->setDescription('Defines whether to include the OSF preprint ID into the Publisher ID field of OPS'),
     Option::create('a', 'saveSupplementaryFiles')
         ->setDescription('Defines whether to save the supplementary file (if not defined, just a remote galley will be created)'),
+    Option::create('n', 'embedSubmissions')
+        ->setDescription('Defines whether submissions should be embedded in the XML or saved into external files (faster)'),
     Option::create('m', 'memory', GetOpt::REQUIRED_ARGUMENT)
         ->setDescription('Memory limit (default "1G")')
         ->setDefaultValue('1G'),
@@ -67,7 +69,7 @@ try {
     Logger::log('Creating output folder');
 
     $output = $settings->output;
-    $xmlOutput = $output . '/xml/';
+    $xmlOutput = $output . '/submissions/';
     $redirectOutput = $output . '/redirects.sql';
     $assignmentsOutput = $output . '/assignments.sql';
     $downloadsOutput = $output . '/downloads.sql';
@@ -75,7 +77,7 @@ try {
     $publicationRelationOutput = $output . '/publication-relation.sql';
     $importOutput = $output . '/import.sh';
     if (!is_dir($xmlOutput)) {
-        mkdir($xmlOutput, 0600, true);
+        mkdir($xmlOutput, $settings->defaultPermission, true);
     }
 
     Logger::log('Creating HTTP client');
@@ -89,7 +91,11 @@ try {
         $attempts = abs($settings->maxRetry) + 1;
         ++$index;
         Logger::log("Processing preprint ${index}/${total}: " . $preprint->id, true);
-        $filename = $xmlOutput . preg_replace('/\W/', '-', $preprint->id) . '.xml';
+        $folderPath = $xmlOutput . preg_replace('/\W/', '-', $preprint->id);
+        if (!is_dir($folderPath)) {
+            mkdir($folderPath, $settings->defaultPermission);
+        }
+        $filename = "${folderPath}/submission.xml";
         if (file_exists($filename)) {
             continue;
         }

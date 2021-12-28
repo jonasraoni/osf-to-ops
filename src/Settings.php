@@ -42,6 +42,10 @@ class Settings
 
     public bool $saveSupplementaryFiles = false;
 
+    public bool $embedSubmissions = false;
+
+    public int $defaultPermission = 0600;
+
     public static function createFromOptions(GetOpt $options): self
     {
         $settings = new static();
