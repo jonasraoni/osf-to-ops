@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PKP\OSF;
 
 use SimpleXMLElement;
+use SplFileInfo;
 
 /**
  * Generates some pre/pos import scripts for SQL and also Apache redirections
@@ -53,8 +54,8 @@ class Generator
         $authorRoleId = 0x00010000;
         return "
         INSERT INTO stage_assignments (submission_id, user_group_id, user_id, date_assigned, can_change_metadata)
-        SELECT p.submission_id, (
-            SELECT user_group_id 
+        SELECT DISTINCT p.submission_id, (
+            SELECT user_group_id
             FROM user_groups
             WHERE role_id = ${authorRoleId}
             AND context_id = s.context_id
@@ -76,18 +77,13 @@ class Generator
         $month = date('Ym');
         $day = date('Ymd');
         $types = [];
-        if (!isset($root->publication->preprint_galley)) {
-            return null;
-        }
         $files = $template->getAllFiles();
         $current = -1;
         $downloads = 0;
-        foreach ($root->publication->preprint_galley as $galley) {
-            if (isset($galley->remote)) {
-                continue;
-            }
-            $downloads = $files[++$current]->attributes->extra->downloads ?? 0;
-            switch (strtolower((string) $galley->name)) {
+        foreach ($files as $versions) {
+            $file = end($versions);
+            $downloads = $file->attributes->downloads;
+            switch (strtoupper((new SplFileInfo($file->attributes->name))->getExtension())) {
                 case 'doc':
                 case 'docx':
                     $types[] = MetricsFileType::DOC;
@@ -109,13 +105,17 @@ class Generator
                 assoc_type, assoc_id, day, month, file_type, metric_type, metric
             )
             SELECT 'osf-import.txt', s.context_id, s.context_id, p.submission_id, pg.galley_id, ${submissionFileType}, pg.submission_file_id, ${day}, ${month}, ${fileType}, 'ops::counter', ${downloads}
-            FROM publication_settings ps
-            INNER JOIN publications p USING (publication_id)
+            FROM publications p
             INNER JOIN submissions s USING (submission_id)
             INNER JOIN publication_galleys pg USING (publication_id)
             WHERE
-                ps.setting_value = ${preprintId}
-                AND ps.setting_name = 'pub-id::publisher-id'
+                p.publication_id = (
+                    SELECT MAX(ps.publication_id)
+                    FROM publication_settings ps
+                    WHERE
+                        ps.setting_value = ${preprintId}
+                        AND ps.setting_name = 'pub-id::publisher-id'
+                )
                 AND pg.remote_url IS NULL
             ORDER BY p.submission_id, pg.galley_id
             LIMIT ${current}, 1;";
@@ -124,7 +124,7 @@ class Generator
 
     public static function importCommand(object $preprint, SimpleXMLElement $root, Settings $settings): string
     {
-        $path = realpath($settings->output . '/xml/' . $preprint->id . '.xml');
+        $path = realpath("{$settings->output}/submissions/{$preprint->id}/submission.xml");
         $context = $settings->context;
         foreach ($root->publication->authors->author ?? [] as $author) {
             $user = strtok((string) $author->email, '@');
@@ -146,6 +146,7 @@ class Generator
                 WHERE
                     ps.setting_value = ${escapedPreprintId}
                     AND ps.setting_name = 'pub-id::publisher-id'
+                LIMIT 1
             ))
             UNION ALL";
     }
@@ -162,21 +163,19 @@ class Generator
         $publicationRelation = DefaultValues::PUBLICATION_RELATION;
         return "
             INSERT INTO publication_settings (publication_id, locale, setting_name, setting_value)
-            VALUES
-            ((
-                SELECT ps.publication_id
-                FROM publication_settings ps
-                WHERE
-                    ps.setting_value = ${escapedPreprintId}
-                    AND ps.setting_name = 'pub-id::publisher-id'
-            ), '', 'vorDoi', ${escapedDoi}),
-            ((
-                SELECT ps.publication_id
-                FROM publication_settings ps
-                WHERE
-                    ps.setting_value = ${escapedPreprintId}
-                    AND ps.setting_name = 'pub-id::publisher-id'
-            ), '', 'relationStatus', '${publicationRelation}');";
+            SELECT ps.publication_id, '', 'vorDoi', ${escapedDoi}
+            FROM publication_settings ps
+            WHERE
+                ps.setting_value = ${escapedPreprintId}
+                AND ps.setting_name = 'pub-id::publisher-id'
+
+            UNION ALL
+
+            SELECT ps.publication_id, '', 'relationStatus', '${publicationRelation}'
+            FROM publication_settings ps
+            WHERE
+                ps.setting_value = ${escapedPreprintId}
+                AND ps.setting_name = 'pub-id::publisher-id';";
     }
 
     private static function escape(string $data): string
