@@ -152,11 +152,9 @@ class Template
             $extension = (new SplFileInfo($data->name))->getExtension();
             $node = $this->addNamespaced($parentNode, 'submission_file');
             $node['id'] = $position;
-            $node['created_at'] = $this->toDate($data->date_created);
-            $node['date_created'] = null;
+            $node['date_created'] = $this->toDate($data->date_created);
             $node['file_id'] = $position;
             $node['stage'] = DefaultValues::STAGE;
-            $node['updated_at'] = $this->toDate($data->date_created);
             $node['viewable'] = 'false';
             $node['genre'] = DefaultValues::GENRE;
             $node['uploader'] = $this->settings->user;
@@ -198,9 +196,12 @@ class Template
             $node['seq'] = 0;
             $node['access_status'] = 0;
             $node['section_ref'] = DefaultValues::GENRE_ABBREVIATION;
-            if ($publishedDate = $this->toDate($preprint->original_publication_date ?? $preprint->date_published)) {
-                $node['date_published'] = $publishedDate;
-            }
+            $preprintPublishedDate = $preprint->original_publication_date ?? $preprint->date_published;
+            $submissionsPublishDate = $this->getPublishDateAtVersion($version);
+            $publishedDate = $version === $versions
+                ? $preprintPublishedDate ?? $submissionsPublishDate
+                : $submissionsPublishDate ?? $preprintPublishedDate;
+            $node['date_published'] = $this->toDate($publishedDate);
 
             if ($authorsCount = count($this->getAuthors())) {
                 $node['primary_contact_id'] = $authorsCount * ($version - 1) + 1;
@@ -390,6 +391,13 @@ class Template
                 $galleyNode->submission_file_ref['id'] = $data;
             }
         }
+    }
+
+    private function getPublishDateAtVersion(int $version): ?string
+    {
+        return ($max = array_reduce($this->getAllFiles(), fn ($max, $versions) => max($max, ($date = $versions[$version]->attributes->date_created ?? null) ? strtotime($date) : 0), 0))
+            ? date('Y-m-d', $max)
+            : null;
     }
 
     private function getVersionCount(): int
