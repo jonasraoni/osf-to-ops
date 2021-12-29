@@ -43,8 +43,8 @@ $cli = new GetOpt([
         ->setDescription('Memory limit (default "1G")')
         ->setDefaultValue('1G'),
     Option::create('s', 'sleep', GetOpt::REQUIRED_ARGUMENT)
-        ->setDescription('Amount of seconds the script will rest after processing each preprint (default 2 seconds)')
-        ->setDefaultValue(2),
+        ->setDescription('Amount of seconds the script will rest after processing each preprint (default 3 seconds)')
+        ->setDefaultValue(3),
     Option::create('r', 'maxRetry', GetOpt::REQUIRED_ARGUMENT)
         ->setDescription('Amount of retries before skipping an article (default 5)')
         ->setDefaultValue(5),
@@ -132,12 +132,11 @@ try {
     }
     file_put_contents($redirectOutput, "SELECT ''", FILE_APPEND);
 
-    $file = new SplFileObject($output . '/import-fixed.sh', 'w');
+    $file = new SplFileObject($output . '/import-reversed.sh', 'w');
     foreach (array_reverse(file($importOutput)) as $line) {
         $file->fwrite($line);
     }
     $file = null;
-    rename($output . '/import-fixed.sh', $importOutput);
 
     Logger::log("\nFinished");
 } catch (\Exception $exception) {

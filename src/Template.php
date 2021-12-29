@@ -142,7 +142,7 @@ class Template
     private function processSubmissionFiles(SimpleXMLElement $parentNode): void
     {
         if (!count($files = $this->getAllFiles())) {
-            throw new Exception('No submission file could be added for the preprint "' . $this->preprint->id . '"');
+            Logger::log('The preprint "' . $this->preprint->id . '" has no submission file');
         }
         $position = 0;
         array_walk_recursive($files, function (object $file) use (&$position, $parentNode) {
@@ -394,7 +394,7 @@ class Template
 
     private function getVersionCount(): int
     {
-        return array_reduce($this->getAllFiles(), fn ($max, $files) => max($max, count($files)), 0);
+        return array_reduce($this->getAllFiles(), fn ($max, $files) => max($max, count($files)), 1);
     }
 
     private function addLocalized(SimpleXMLElement $node, string $name, $value): SimpleXMLElement

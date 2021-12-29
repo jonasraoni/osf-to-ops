@@ -73,11 +73,14 @@ class Generator
 
     public static function downloadStatistics(object $preprint, SimpleXMLElement $root, Template $template): \Generator
     {
+        if (!count($files = $template->getAllFiles())) {
+            return;
+        }
+
         $preprintId = self::escape((string) $preprint->id);
         $month = date('Ym');
         $day = date('Ymd');
         $types = [];
-        $files = $template->getAllFiles();
         $current = -1;
         $downloads = 0;
         foreach ($files as $versions) {
@@ -97,7 +100,6 @@ class Generator
             }
         }
         $submissionFileType = 0x0000203;
-        $files = $template->getAllFiles();
         foreach ($types as $fileType) {
             yield "
             INSERT INTO metrics (
