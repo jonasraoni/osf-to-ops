@@ -395,7 +395,7 @@ class Template
 
     private function getPublishDateAtVersion(int $version): ?string
     {
-        return ($max = array_reduce($this->getAllFiles(), fn ($max, $versions) => max($max, ($date = $versions[$version]->attributes->date_created ?? null) ? strtotime($date) : 0), 0))
+        return ($max = array_reduce($this->getAllFiles(), fn ($max, $versions) => max($max, ($date = $versions[$version - 1]->attributes->date_created ?? null) ? strtotime($date) : 0), 0))
             ? date('Y-m-d', $max)
             : null;
     }

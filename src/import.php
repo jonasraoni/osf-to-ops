@@ -112,7 +112,7 @@ try {
                 }
                 file_put_contents($assignmentsOutput, Generator::linkUsers($preprint) . "\n", FILE_APPEND);
                 file_put_contents($publicationRelationOutput, Generator::publicationRelation($preprint) . "\n", FILE_APPEND);
-                foreach (Generator::downloadStatistics($preprint, $root, $template) as $statement) {
+                foreach (Generator::downloadStatistics($preprint, $template) as $statement) {
                     file_put_contents($downloadsOutput, $statement . "\n", FILE_APPEND);
                 }
                 if ($settings->baseUrl) {

@@ -71,7 +71,7 @@ class Generator
         ORDER BY a.seq;";
     }
 
-    public static function downloadStatistics(object $preprint, SimpleXMLElement $root, Template $template): \Generator
+    public static function downloadStatistics(object $preprint, Template $template): \Generator
     {
         if (!count($files = $template->getAllFiles())) {
             return;
