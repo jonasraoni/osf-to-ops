@@ -81,9 +81,8 @@ class Generator
         $month = date('Ym');
         $day = date('Ymd');
         $types = [];
-        $current = -1;
         $downloads = 0;
-        foreach ($files as $versions) {
+        foreach ($files as $current => $versions) {
             $file = end($versions);
             $downloads = $file->attributes->downloads;
             switch (strtoupper((new SplFileInfo($file->attributes->name))->getExtension())) {
