@@ -121,15 +121,18 @@ class Template
                 $versions = [];
                 foreach (PageIterator::create($this->client, $file->relationships->versions->links->related->href) as $version) {
                     if (!$version->attributes->size) {
-                        Logger::log('Skipped empty submission file revision for the preprint "' . $this->preprint->id . '"');
+                        Logger::log("Skipped empty submission file revision for the file \"{$file->attributes->name}\" at the preprint \"{$this->preprint->id}\"");
                         continue;
                     }
                     $version->attributes->downloads = $file->attributes->extra->downloads ?? 0;
                     array_unshift($versions, $version);
                 }
+                if (!count($versions)) {
+                    Logger::log("Skipped file \"{$file->attributes->name}\" due to invalid file revisions at the preprint \"{$this->preprint->id}\"");
+                }
                 return $versions;
             }, iterator_to_array(PageIterator::create($this->client, $url)));
-            array_push($files, ...$folderFiles);
+            array_push($files, ...array_filter($folderFiles, fn ($versions) => count($versions)));
         }
         return $files;
     }
