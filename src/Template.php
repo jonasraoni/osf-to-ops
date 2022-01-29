@@ -52,7 +52,7 @@ class Template
     private function processPreprint(): SimpleXMLElement
     {
         $node = new SimpleXMLElement(
-            '<?xml version="1.0"?>
+            '<?xml version="1.0" encoding="utf-8"?>
             <preprint xmlns="http://pkp.sfu.ca" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pkp.sfu.ca native.xsd">
             </preprint>'
         );
@@ -410,9 +410,7 @@ class Template
 
     private function addLocalized(SimpleXMLElement $node, string $name, $value): SimpleXMLElement
     {
-        // Unexpected unescaped entity
-        $value = preg_replace(['/&(\s)/', '//', '//'], ['&amp;$1', 'ff', 'f'], (string) $value);
-        $node = $node->addChild($name, $value);
+        $node = $node->addChild($name, (string) $value);
         $node['locale'] = $this->settings->locale;
         return $node;
     }
