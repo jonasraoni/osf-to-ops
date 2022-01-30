@@ -199,7 +199,7 @@ class Template
             $node['seq'] = 0;
             $node['access_status'] = 0;
             $node['section_ref'] = DefaultValues::GENRE_ABBREVIATION;
-            $preprintPublishedDate = $preprint->original_publication_date ?? $preprint->date_published;
+            $preprintPublishedDate = $preprint->date_published;
             $submissionsPublishDate = $this->getPublishDateAtVersion($version);
             $publishedDate = $version === $versions
                 ? $preprintPublishedDate ?? $submissionsPublishDate
