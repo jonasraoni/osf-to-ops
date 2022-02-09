@@ -27,6 +27,8 @@ class Logger
 
     public static function handleWarnings(): void
     {
-        set_error_handler(fn (int $code, string $message, string $file, int $line): bool => throw new Exception("${message} at ${file}:${line}", $code));
+        set_error_handler(function (int $code, string $message, string $file, int $line): bool {
+            throw new Exception("${message} at ${file}:${line}", $code);
+        });
     }
 }
