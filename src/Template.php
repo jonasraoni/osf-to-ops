@@ -342,7 +342,7 @@ class Template
             $authorId = $data->id ?? preg_replace('/^\w+-/', '', $author->id);
             $authorNode->email = sprintf($this->settings->email, $authorId);
             foreach ($data->attributes->social ?? [] as $type => $value) {
-                if ($type === 'orcid') {
+                if ($type === 'orcid' && $value) {
                     $authorNode->orcid = "https://orcid.org/${value}";
                     break;
                 }
