@@ -6,6 +6,7 @@ This repository uses the [OSF API](https://developer.osf.io) ([Open Science Fram
 - The authors will be imported as users, thus, they will be able to access their submissions once they "recover" their accounts (the OPS administrator will have to help), if this isn't desirable, avoid the item 6 and review the file on the item 7, to setup the right owner username.
 - As retrieving the user email isn't provided by the API (which is great), the code will import the users using a fake email. The email pattern can be configured through an argument.
 - This was built for OPS 3.4.0, future versions might introduce breaking changes.
+- It also works with OPS 3.3.0, if you temporarily merge the PRs available here to your installation: https://github.com/pkp/pkp-lib/issues/7639.
 
 
 ## Instructions
