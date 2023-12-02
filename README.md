@@ -1,5 +1,14 @@
 # OSF to OPS Import
 
+[![Build Status](https://travis-ci.com/jonasraoni/osf-to-ops.svg?branch=master)](https://travis-ci.com/jonasraoni/osf-to-ops)
+[![OPS compatibility](https://img.shields.io/badge/ops-3.4-brightgreen)](https://github.com/pkp/ops/tree/stable-3_4_0)
+[![GitHub release](https://img.shields.io/github/v/release/jonasraoni/osf-to-ops?include_prereleases)](https://github.com/jonasraoni/osf-to-ops/releases)
+![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/jonasraoni/osf-to-ops)
+[![License type](https://img.shields.io/github/license/jonasraoni/osf-to-ops)](https://github.com/jonasraoni/osf-to-ops/blob/main/LICENSE)
+[![Number of downloads](https://img.shields.io/github/downloads/jonasraoni/osf-to-ops/total)](https://github.com/jonasraoni/osf-to-ops/releases)
+[![Commit activity per year](https://img.shields.io/github/commit-activity/y/jonasraoni/osf-to-ops)](https://github.com/jonasraoni/osf-to-ops/graphs/code-frequency)
+[![Contributors](https://img.shields.io/github/contributors-anon/jonasraoni/osf-to-ops)](https://github.com/jonasraoni/osf-to-ops/graphs/contributors)
+
 ## About
 This repository uses the [OSF API](https://developer.osf.io) ([Open Science Framework](https://osf.io)) to gather a list of preprints and converts them to a XML format acceptable by the [PKP OPS (Open Preprint Systems)](https://pkp.sfu.ca/ops) Native Import/Export Plugin.
 
